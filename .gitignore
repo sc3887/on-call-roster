@@ -1,0 +1,13 @@
+node_modules/
+dist/
+coverage/
+.env
+.env.*
+!.env.example
+*.log
+.DS_Store
+.idea/
+.vscode/
+backend/prisma/*.db
+docker-compose.override.yml
+*.tsbuildinfo
