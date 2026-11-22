@@ -2,7 +2,7 @@
 
 [![CI](https://github.com/sc3887/on-call-roster/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/sc3887/on-call-roster/actions/workflows/ci.yml)
 
-Relay היא מערכת לניהול תורנויות צוות. היא כוללת ממשק משתמש, שרת API ומסד נתונים, וניתנת להפעלה מלאה באמצעות Docker Compose או להרצה מקומית לצורכי פיתוח.
+Relay היא מערכת לניהול תורנויות צוות. אפשר לשכפל את המאגר מ-GitHub ללא Docker. להרצה מלאה אפשר להשתמש ב-Docker Compose, או להריץ את הממשק והשרת מקומית עם PostgreSQL שמותקן במחשב.
 
 ## תוכן עניינים
 
@@ -65,28 +65,77 @@ docker compose down
 
 ## הרצה מקומית לפיתוח
 
-בהרצה זו ממשק המשתמש והשרת פועלים ישירות דרך Node.js. PostgreSQL פועל ב-Docker.
+בהרצה זו ממשק המשתמש והשרת פועלים ישירות דרך Node.js. אפשר להריץ את PostgreSQL ב-Docker, או להתקין אותו ישירות במחשב ולהריץ בלי Docker.
 
-**דרישות:** [Node.js 22 ומעלה](https://nodejs.org/) ו-[Docker Desktop](https://www.docker.com/products/docker-desktop/).
+**דרישות:** [Node.js 22 ומעלה](https://nodejs.org/) ו-PostgreSQL 16. Docker Desktop נדרש רק אם בוחרים להריץ את PostgreSQL ב-Docker.
 
 ### 1. שכפול הפרויקט והכנת מסד הנתונים
 
-בחלון PowerShell, בתיקייה שבה תרצו לשמור את הפרויקט, הריצו:
+בחלון PowerShell, בתיקייה שבה תרצו לשמור את הפרויקט, שכפלו את המאגר והכינו את קובץ הסביבה:
 
 ```powershell
 git clone https://github.com/sc3887/on-call-roster.git
 cd on-call-roster
 Copy-Item .env.example .env
+```
+
+### 2. בחירת מסד הנתונים
+
+#### אפשרות א׳: PostgreSQL ב-Docker
+
+ודאו ש-Docker Desktop פועל, ואז הריצו:
+
+```powershell
 docker compose up -d db
+```
+
+#### אפשרות ב׳: PostgreSQL מקומי, ללא Docker
+
+1. אם `winget` מותקן במחשב, פתחו PowerShell והריצו את הפקודה הבאה. אשף ההתקנה ייפתח; השאירו את ברירות המחדל, ובשלב הסיסמה הגדירו סיסמה למשתמש `postgres` וזכרו אותה:
+
+```powershell
+winget install --id PostgreSQL.PostgreSQL.16 --exact
+```
+
+אם `winget` אינו זמין, התקינו את [PostgreSQL 16 ל-Windows](https://www.postgresql.org/download/windows/) דרך האתר. גם בהתקנה זו הגדירו סיסמה למשתמש `postgres`.
+
+2. פתחו מתפריט Start את **SQL Shell (psql)**. במסך השאלות לחצו Enter כדי לקבל את ברירות המחדל: `localhost`, מסד הנתונים `postgres`, פורט `5432` ומשתמש `postgres`. כשהתוכנה מבקשת סיסמה, הזינו את הסיסמה שהגדרתם בהתקנה. בזמן ההקלדה לא יוצגו תווים על המסך — זה תקין.
+3. כשתופיע שורת פקודה שמסתיימת ב-`postgres=#`, העתיקו והדביקו את הפקודה הבאה ולחצו Enter:
+
+```sql
+CREATE ROLE roster WITH LOGIN PASSWORD 'roster-local-password';
+```
+
+4. העתיקו והדביקו את הפקודה הבאה ולחצו Enter:
+
+```sql
+CREATE DATABASE roster OWNER roster;
+```
+
+5. אחרי ששתי הפקודות הצליחו, הקלידו `\q` ולחצו Enter כדי לצאת מ-SQL Shell. כעת חזרו ל-PowerShell והמשיכו לסעיף הבא.
+
+הפקודות מיועדות למסד נתונים חדש. אם מתקבלת הודעה שהמשתמש `roster` כבר קיים, הריצו במקום הפקודה הראשונה:
+
+```sql
+ALTER ROLE roster WITH LOGIN PASSWORD 'roster-local-password';
+```
+
+אם מסד הנתונים `roster` כבר קיים, אל תריצו שוב את `CREATE DATABASE`. בקובץ `.env` פרטי החיבור צריכים להתאים ל-PostgreSQL המקומי: כתובת `localhost`, פורט `5432`, מסד נתונים `roster`, משתמש `roster` וסיסמה `roster-local-password`. סיסמת הדוגמה מיועדת לפיתוח מקומי בלבד.
+
+### 3. התקנת התלויות, יצירת הסכמה ונתוני הדגמה
+
+לאחר שמסד הנתונים פועל, חזרו לתיקיית הפרויקט והריצו:
+
+```powershell
 npm.cmd ci
 npm.cmd run db:generate
 npm.cmd run db:migrate:dev
 npm.cmd run db:seed
 ```
 
-הפקודות מתקינות את התלויות, יוצרות את טבלאות מסד הנתונים ומכניסות נתוני הדגמה.
+הפקודות מתקינות את התלויות, יוצרות את Prisma Client, מפעילות את המיגרציות ומכניסות נתוני הדגמה.
 
-### 2. הפעלת השרת
+### 4. הפעלת השרת
 
 באותו חלון, מתוך תיקיית `on-call-roster`, הפעילו:
 
@@ -96,7 +145,7 @@ npm.cmd run dev --workspace=backend
 
 השאירו את החלון פתוח. השרת פועל בפורט `4000`.
 
-### 3. הפעלת הממשק
+### 5. הפעלת הממשק
 
 פתחו חלון PowerShell נוסף מתוך תיקיית `on-call-roster` והפעילו:
 
@@ -108,11 +157,13 @@ npm.cmd run dev --workspace=frontend
 
 ב-PowerShell נעשה שימוש ב-`npm.cmd` כדי להריץ npm ללא שינוי הגדרות האבטחה של Windows. ב-macOS או Linux השתמשו ב-`cp .env.example .env` ובפקודת `npm` במקום `npm.cmd`.
 
-לעצירת השרתים, לחצו `Ctrl+C` בכל אחד מחלונות הפיתוח. לעצירת מסד הנתונים, הריצו מתיקיית הפרויקט:
+לעצירת השרתים, לחצו `Ctrl+C` בכל אחד מחלונות הפיתוח. אם PostgreSQL פועל ב-Docker, עצרו אותו מתיקיית הפרויקט:
 
 ```powershell
 docker compose down
 ```
+
+בהתקנה מקומית של PostgreSQL אפשר לעצור אותו דרך **Services** של Windows או דרך כלי ניהול השירותים של PostgreSQL.
 
 ## מבנה המערכת
 
@@ -121,11 +172,33 @@ on-call-roster/
 ├── .github/workflows/ci.yml   בדיקות ובניית הפרויקט ב-GitHub Actions
 ├── backend/                   שרת Express, מודלים ובדיקות
 │   ├── prisma/                סכמת מסד הנתונים, מיגרציות ונתוני הדגמה
-│   └── src/                   נתיבים, בקרים, מודלים ותשתיות
+│   │   └── migrations/        היסטוריית שינויים בסכמת מסד הנתונים
+│   ├── scripts/               סקריפטים עזר, כולל פקודות Prisma
+│   ├── src/
+│   │   ├── conf/              טעינת הגדרות וחיבור למסד הנתונים
+│   │   ├── controllers/       טיפול בבקשות ובתגובות HTTP
+│   │   ├── lib/               ולידציה, תאריכים ולוגיקה משותפת
+│   │   ├── middleware/        אימות, הרשאות וטיפול בשגיאות
+│   │   ├── models/            שאילתות וגישה לנתונים
+│   │   ├── routes/            הגדרת נתיבי ה-API
+│   │   └── types/             טיפוסים משותפים בשרת
+│   └── test/                  בדיקות יחידה, API ואינטגרציה
 ├── frontend/                  ממשק React
 │   ├── public/                קבצים סטטיים
-│   ├── src/                   רכיבי הממשק, שירותים וניהול מצב
-│   └── test/                  בדיקות יחידה לשירותים ולניהול המצב
+│   │   └── images/            תמונות ונכסים סטטיים
+│   ├── src/
+│   │   ├── components/
+│   │   │   ├── accessibility/ רכיבי נגישות
+│   │   │   ├── admin/         מסך ניהול
+│   │   │   ├── auth/          התחברות
+│   │   │   ├── common/        רכיבים משותפים
+│   │   │   ├── roster/        לוח תורנויות וטפסי תורנות
+│   │   │   └── support/       תמיכה
+│   │   ├── services/          תקשורת עם ה-API
+│   │   ├── store/             ניהול מצב האפליקציה
+│   │   ├── types/             טיפוסי TypeScript
+│   │   └── utils/             תרגומים וכלי עזר
+│   └── test/                  בדיקות שירות API וניהול מצב
 ├── docker-compose.yml         שירותי מסד נתונים, שרת וממשק
 ├── package.json               הגדרות וסקריפטים משותפים
 └── .env.example               ערכי סביבה לדוגמה
